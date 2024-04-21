@@ -1,0 +1,60 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[margin=2in]{geometry}
+
+\sloppy
+\geometry{margin=1.5in}
+
+\title{In-network feature collection of H264 or H265 streams - Project plan}
+\author{Fruzsina Habzda, Balázs Racskó, Ákos András Kajtár}
+\date{April 2024}
+
+\begin{document}
+
+\maketitle
+
+\section{Project Overview}
+
+The aim of our project is to collect data from H264 and H265 streams at ...
+
+This involves parsing I and P frames, collecting per stream features, and transmitting telemetry packets to a collector server for analysis.
+
+\section{Goals}
+
+Finding, identifying, and parsing I and P frames of H264 or H265 streams.
+
+Collecting per stream features like i-frame rate, p-frame rate, i-frame sizes, p-frame sizes, and inter-frame gaps.
+
+Implementing a telemetry packet generator to transmit collected features to a telemetry collector server.
+
+Developing a telemetry collector server to receive and analyze telemetry packets.
+
+\section{Detailed Plan}
+
+To achieve this, we have to:
+
+\begin{itemize}
+\item research and understand H264 ans H265 streams, I and P frames, and real-time streaming in whole
+\item write parsers for I and P frames
+\item implement the extraction of frame features
+\item implement logic to calculate some of the collectable data (e.g. sizes and gaps)
+\item develop a system to collect the given data (I'm not yet sure about the sequence of these steps)
+\item create  a telemetry collector server (design the storage and communication method as well)
+\item implement a telemetry packet generator
+\item integrate the system (packet generator, parser, collector server)
+\item test the system
+\item prepare a presentation of our solution
+\item present the project
+\end{itemize}
+
+
+\section{Due dates}
+
+\begin{itemize}
+\item 22 Apr Project plan
+\item 13 May (?) Presentation
+\item 6 Jul Finish
+\end{itemize}
+
+\end{document}
