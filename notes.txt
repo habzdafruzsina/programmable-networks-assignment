@@ -1,0 +1,74 @@
+1.: packet reflector
+visszaküldi a feladónak a csomagot
+
+2.: packet reflector
+továbbküldi az üzenetet, előredefiniált módon
+(használ táblát, hogy meghatározza, merre kell továbbküldeni)
+
+3.: switching
+továbbküldi az üzenetet a mac address alapján
+(match-action table-t használ a port meghatározására)
+
+4.: flooding
+előző továbbfejlesztése:
+ha nem tudja hogy merre kell továbbküldeni, kiküldi minden porton (kivéve ahonnan jött)
+
+5.: learning
+a táblát üresen hagyjuk, hagyjuk hogy automatikusan megtöltse a switch
+(mo.: controller-rel, ...
+
+6.: calculator
+a header tartalmazza az adatokat, ezeket parsolni kell
+a kiszámított értéket a feladónak küldjük vissza
+
+7.: Heavy Hitter Detection
+probabilistic data structures (pontosabban: counting bloom filter)
+ilyenre nem lesz szükségünk ~~
+
+
+használjuk a 2. feladatban megadott send.py és receive.py-t
+paraméterek a send-hez: 10.0.0.2 "Hello H2"
+(hova és mit)
+át kell alakítani a send.py-t hogy H264 or H265 stream-eket (I és P frame-eket) küldjön
+
+
+telemetry:
+1. ea 105-ös dia
+
+maintain state between packages:
+2. ea 37
+
+sending packets to control plane
+2. ea 67
+
+stateless vs stateful
+3. ea 25, 26, ...
+
+calculating inter packet gap !!!!
+3. ea 27
+
+counter !!!
+3. ea 32, ...
+
+stateful summary
+3. ea 45
+
+example applications (ezeket még nem néztem meg)
+https://www.net.t-labs.tu-berlin.de/~stefan/neat18.pdf
+https://www.youtube.com/watch?v=G4L2ys-_W9w#t=26m26s
+https://p4.org/assets/P4WS_2018/Marco_Chiesa.pdf
+
+I frames:
+kulcskockák; önállóan megállják a helyüket
+általában szabványos időközönként jönnek a streamben
+referenciaként szolgálnak a P frame-ek dekódolásánál
+(ofc nagyobbak mint a P frame-k)
+
+P frames:
+Predictive-coded frames
+korábbi I vagy P frame-kre támaszkodnak
+a változásokat tartalmazzák az előzőekhez képest
+
+A frame headerben lesz a frame típusa (I/P), ahogy a méret is
+A framek packet-ekre osztva mennek át a fogadóhoz (meg vannak számozva)
+Gondolom nekünk mindig az első part-ot kell vizsgálni (?)
