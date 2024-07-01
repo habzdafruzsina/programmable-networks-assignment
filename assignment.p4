@@ -59,10 +59,9 @@ header telemetry_t {  /* CUSTOM STUFF - COULD BE CHANGED */
     bit<32> egress_port;
     bit<32> queue_depth;
     bit<32> timestamp;
-	bit<32> i_frame_rate;
-	bit<32> p_frame_rate;
-	bit<32> i_frame_size; // IT'S MORE COMPLICATE TO COMPUTE, BUT FOR NOW I USE JUST THE PACKET SIZES
-	bit<32> p_frame_size;
+    bit<8> frame_type;
+	bit<32> frame_rate;
+	bit<32> frame_size; // IT'S MORE COMPLICATE TO COMPUTE, BUT FOR NOW I USE JUST THE PACKET SIZES
 	bit<32> inter_frame_gaps;
 }
 
@@ -74,14 +73,17 @@ struct headers {
     h265_nal_header_t h265_nal_header;
 }
 
-struct metadata { // ALSO CUSTOM - USING FOR INFO SHARING BETWEEN PACKETS
+// USED FOR INFO SHARING BETWEEN 'STAGES'
+struct metadata { 
     bit<32> ingress_port;
     bit<32> egress_port;
-	bit<32> packet_p_count; // initially set to zero if I'm right
-	bit<32> packet_i_count;
-	bit<64> last_p_arrival_time;
-	bit<64> last_i_arrival_time;
 }
+
+// ALSO CUSTOM - USING FOR INFO SHARING BETWEEN PACKETS
+register<bit<32>>(1) packet_p_count; // initially set to zero if I'm right
+register<bit<32>>(1) packet_i_count;
+register<bit<32>>(1) last_p_arrival_time;
+register<bit<32>>(1) last_i_arrival_time;
 
 
 /************************************************************************
@@ -143,52 +145,52 @@ control MyIngress(inout headers hdr,
 	action forward_with_telemetry(inout headers hdr, inout metadata meta) {
         meta.ingress_port = standard_metadata.ingress_port;
         meta.egress_port = standard_metadata.egress_port;
-        bit<16> header_sizes = 56; // sum of header sizes / 8
+        bit<16> header_sizes = 57; // sum of header sizes / 8
+        bit<32> packet_count;
+        bit<32> last_arrival_time;
+        telemetry_t telemetry;
         
         if(hdr.nal_unit_type == 0b000101){ // binary 5 is I frame
-            telemetry_t telemetry;
-            bit<64> elapsed_time_i = local_time() - meta.last_i_arrival_time;
-            
-            if (elapsed_i_time > 0 && meta.packet_i_count > 1) {
-                bit<32> i_rate = (meta.packet_i_count * 1000000) / elapsed_time;  // Packets per second
-                telemetry.i_frame_rate = i_rate;
-            }
-            telemetry.i_frame_size = packet.length - header_sizes;
-            telemetry.switch_id = 1;  // example switch ID
-            telemetry.ingress_port = meta.ingress_port;
-            telemetry.egress_port = meta.egress_port;
-            telemetry.timestamp = local_time();
-            //telemetry.inter_frame_gaps
-            
-            meta.last_i_arrival_time = local_time();
-            meta.packet_i_count = meta.packet_i_count + 1;
-        }
-        
-        
-        if(hdr.nal_unit_type == 0b000001 ){ // binary 1 is P frame
-            telemetry_t telemetry;
-            bit<64> elapsed_time_p = local_time() - meta.last_p_arrival_time;
-            
-            if (elapsed_p_time > 0 && meta.packet_p_count > 1) {
-                bit<32> p_rate = (meta.packet_p_count * 1000000) / elapsed_time_p;  // Packets per second
-                telemetry.p_frame_rate = i_rate;
-            }
-            telemetry.p_frame_size = packet.length - header_sizes;
-            telemetry.switch_id = 1;  // example switch ID
-            telemetry.ingress_port = meta.ingress_port;
-            telemetry.egress_port = meta.egress_port;
-            telemetry.timestamp = local_time();
-            //telemetry.inter_frame_gaps
-            
-            meta.last_p_arrival_time = local_time();
-            meta.packet_p_count = meta.packet_p_count + 1;
-        }
-        
 
-        send_to_collector(telemetry); // NOT YET IMPLEMENTED
+            // READING REGISTERS
+            packet_i_count.read(packet_count, 0);
+            last_i_arrival_time.read(last_arrival_time, 0);
+            
+            // SETTING REGISTERS
+            packet_i_count.write(0, packet_count + 1);
+            last_i_arrival_time.write(0, local_time());
+        }
+
+        if(hdr.nal_unit_type == 0b000001){ // binary 1 is P frame
+
+            // READING REGISTERS
+            packet_p_count.read(packet_count, 0);
+            last_p_arrival_time.read(last_arrival_time, 0);
+            
+            // SETTING REGISTERS
+            packet_p_count.write(0, packet_count + 1);
+            last_p_arrival_time.write(0, local_time());
+        }
+
+        bit<64> elapsed_time = local_time() - last_arrival_time;
+        
+        if (elapsed_time > 0 && packet_count > 1) {
+            bit<32> rate = (packet_count * 1000000) / elapsed_time;  // Packets per second
+            telemetry.frame_rate = rate;
+        }
+        telemetry.frame_type = hdr.nal_unit_type;
+        telemetry.frame_size = packet.length - header_sizes; // not entirely correct
+        telemetry.switch_id = 1;  // example switch ID
+        telemetry.ingress_port = meta.ingress_port;
+        telemetry.egress_port = meta.egress_port;
+        telemetry.timestamp = local_time();
+        //telemetry.inter_frame_gaps
+
+        send_to_collector(telemetry);
 
         apply_action(forward(hdr, meta));
 	}
+
 
     action send_to_collector(packet_out packet,
                             in headers hdr,
