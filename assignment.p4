@@ -6,6 +6,16 @@
 *********************** H E A D E R S  ***********************************
 *************************************************************************/
 
+header h265_slice_header_t { // NOT SURE OF THE STRUCTURE, SIENCE THE ISO DOCS ARE NOT FREE.........
+    bit<1>  first_slice_segment_in_pic_flag;
+    bit<1>  no_output_of_prior_pics_flag;
+    bit<6>  slice_type; // (0 = P slice, 1 = B slice, 2 = I slice)
+    bit<1>  pic_output_flag;
+    bit<3>  colour_plane_id;
+    bit<4>  slice_pic_order_cnt_lsb; // picture order count for the slice (can be used to derive the frame ID)
+    bit<1>  short_term_ref_pic_set_sps_flag;
+}
+
 header h265_nal_header_t {
     bit<1> forbidden_zero_bit;
     bit<6> nal_unit_type;
@@ -71,6 +81,7 @@ struct headers {
     udp_t udp;
     rtp_t rtp;
     h265_nal_header_t h265_nal_header;
+    h265_slice_header_t h265_slice_header;
 }
 
 // USED FOR INFO SHARING BETWEEN 'STAGES'
@@ -118,13 +129,20 @@ parser MyParser(packet_in packet,
 
     state parse_rtp {
         packet.extract(hdr.rtp);
-        transition parse_h265;
+        transition parse_h265_nal_hdr;
     }
 
-    state parse_h265 {
+    state parse_h265_nal_hdr {
         packet.extract(hdr.h265_nal_header);
         transition accept;
+        //transition parse_h265_slice_hdr;
     }
+
+    // SHOULD BE PARSED, CAUSE IT CONTAINS DATA TO IDENTIFY THE FRAMES AND SLICES
+    /*state parse_h265_slice_hdr {
+        packet.extract(hdr.h265_slice_header);
+        transition accept;
+    }*/
 }
 
 
@@ -142,6 +160,16 @@ control MyIngress(inout headers hdr,
 	*************************  ACTIONS   *************************
 	**************************************************************/
 
+    action determine_frame_type(bit<6> nal_unit_type) {
+        if (nal_unit_type == 19 || nal_unit_type == 20 || nal_unit_type == 21) {
+            meta.frame_type = 1;  // I-frame
+        } else if (nal_unit_type == 0 || nal_unit_type == 1 || nal_unit_type == 8 || nal_unit_type == 9) {
+            meta.frame_type = 2;  // P-frame (? - not sure)
+        } else {
+            meta.frame_type = 0;
+        }
+    }
+
 	action forward_with_telemetry(inout headers hdr, inout metadata meta) {
         meta.ingress_port = standard_metadata.ingress_port;
         meta.egress_port = standard_metadata.egress_port;
@@ -150,7 +178,9 @@ control MyIngress(inout headers hdr,
         bit<32> last_arrival_time;
         telemetry_t telemetry;
         
-        if(hdr.nal_unit_type == 0b000101){ // binary 5 is I frame
+        if(hdr.h265_nal_header.nal_unit_type == 19 || 
+          hdr.h265_nal_header.nal_unit_type == 20 || 
+          hdr.h265_nal_header.nal_unit_type == 21){ // I frame
 
             // READING REGISTERS
             packet_i_count.read(packet_count, 0);
@@ -161,7 +191,10 @@ control MyIngress(inout headers hdr,
             last_i_arrival_time.write(0, local_time());
         }
 
-        if(hdr.nal_unit_type == 0b000001){ // binary 1 is P frame
+        if(hdr.h265_nal_header.nal_unit_type == 0 || 
+          hdr.h265_nal_header.nal_unit_type == 1 || 
+          hdr.h265_nal_header.nal_unit_type == 8 || 
+          hdr.h265_nal_header.nal_unit_type == 9){ // P frame
 
             // READING REGISTERS
             packet_p_count.read(packet_count, 0);
