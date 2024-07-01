@@ -53,12 +53,17 @@ header ethernet_t {
     bit<16> etherType;
 }
 
-header telemetry_t {
+header telemetry_t {  /* CUSTOM STUFF - COULD BE CHANGED */
     bit<32> switch_id;
     bit<32> ingress_port;
     bit<32> egress_port;
     bit<32> queue_depth;
     bit<32> timestamp;
+	bit<32> i_frame_rate;
+	bit<32> p_frame_rate;
+	bit<32> i_frame_size; // IT'S MORE COMPLICATE TO COMPUTE, BUT FOR NOW I USE JUST THE PACKET SIZES
+	bit<32> p_frame_size;
+	bit<32> inter_frame_gaps;
 }
 
 struct headers {
@@ -69,8 +74,13 @@ struct headers {
     h265_nal_header_t h265_nal_header;
 }
 
-struct metadata {
-    /* empty */
+struct metadata { // ALSO CUSTOM - USING FOR INFO SHARING BETWEEN PACKETS
+    bit<32> ingress_port;
+    bit<32> egress_port;
+	bit<32> packet_p_count; // initially set to zero if I'm right
+	bit<32> packet_i_count;
+	bit<64> last_p_arrival_time;
+	bit<64> last_i_arrival_time;
 }
 
 
@@ -121,6 +131,7 @@ parser MyParser(packet_in packet,
 *************************************************************************/
 
 control MyIngress(inout headers hdr,
+			      packet_in packet,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
 				  
@@ -129,12 +140,62 @@ control MyIngress(inout headers hdr,
 	*************************  ACTIONS   *************************
 	**************************************************************/
 
-	action send_telemetry() {
+	action forward_with_telemetry(inout headers hdr, inout metadata meta) {  
+		apply {
+			meta.ingress_port = standard_metadata.ingress_port;
+			meta.egress_port = standard_metadata.egress_port;
+			bit<16> header_sizes = 56; // sum of header sizes / 8
+			
+			if(header.nal_unit_type == 0b000101){ // binary 5 is I frame
+			    telemetry_t telemetry;
+				bit<64> elapsed_time_i = local_time() - meta.last_i_arrival_time;
+				
+				if (elapsed_i_time > 0 && meta.packet_i_count > 1) {
+					bit<32> i_rate = (meta.packet_i_count * 1000000) / elapsed_time;  // Packets per second
+					telemetry.i_frame_rate = i_rate;
+				}
+				telemetry.i_frame_size = packet.length - header_sizes;
+				telemetry.switch_id = 1;  // example switch ID
+				telemetry.ingress_port = meta.ingress_port;
+				telemetry.egress_port = meta.egress_port;
+				telemetry.timestamp = local_time();
+				//telemetry.inter_frame_gaps
+				
+				meta.last_i_arrival_time = local_time();
+				meta.packet_i_count = meta.packet_i_count + 1;
+			}
+			
+			
+			if(header.nal_unit_type == 0b000001 ){ // binary 1 is P frame
+			    telemetry_t telemetry;
+				bit<64> elapsed_time_p = local_time() - meta.last_p_arrival_time;
+				
+				if (elapsed_p_time > 0 && meta.packet_p_count > 1) {
+					bit<32> p_rate = (meta.packet_p_count * 1000000) / elapsed_time_p;  // Packets per second
+					telemetry.p_frame_rate = i_rate;
+				}
+				telemetry.p_frame_size = packet.length - header_sizes;
+				telemetry.switch_id = 1;  // example switch ID
+				telemetry.ingress_port = meta.ingress_port;
+				telemetry.egress_port = meta.egress_port;
+				telemetry.timestamp = local_time();
+				//telemetry.inter_frame_gaps
+				
+				meta.last_p_arrival_time = local_time();
+				meta.packet_p_count = meta.packet_p_count + 1;
+			}
+			
 
+			send_to_collector(telemetry); // NOT YET IMPLEMENTED
+
+			apply_action(forward(hdr, meta));
+		}
 	}
 
-	action forward(bit<9> port) {
-		standard_metadata.egress_spec = port;
+	action forward(inout headers hdr, inout metadata meta) {
+		apply {
+			standard_metadata.egress_spec = get_egress_port(hdr.ipv4.dstAddr);
+		}
 	}
 
 	action drop() {
@@ -151,29 +212,21 @@ control MyIngress(inout headers hdr,
 			hdr.ethernet.dstAddr: exact;
 		}
 		actions = {
-			forward;
+			forward_with_telemetry;
 			drop;
 		}
 		size = 1024;
-		default_action = forward();
-	}
-
-	table telemetry_table {
-		actions = {
-			send_telemetry;
-		}
-		size = 1;
-		default_action = send_telemetry();
-	}
-				  
+		default_action = forward_with_telemetry();
+	}		  
 				  
 				  
 	/********************
 	******* APPLY *******
 	*********************/
 
-    apply(forward_table);
-    apply(telemetry_table);
+    apply(
+		forward_table
+    );
 }
 
 
@@ -201,7 +254,6 @@ control MyDeparser(packet_out packet, in headers hdr) {
     apply {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.ipv4);
-        packet.emit(hdr.telemetry);
     }
 }
 
