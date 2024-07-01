@@ -140,62 +140,58 @@ control MyIngress(inout headers hdr,
 	*************************  ACTIONS   *************************
 	**************************************************************/
 
-	action forward_with_telemetry(inout headers hdr, inout metadata meta) {  
-		apply {
-			meta.ingress_port = standard_metadata.ingress_port;
-			meta.egress_port = standard_metadata.egress_port;
-			bit<16> header_sizes = 56; // sum of header sizes / 8
-			
-			if(header.nal_unit_type == 0b000101){ // binary 5 is I frame
-			    telemetry_t telemetry;
-				bit<64> elapsed_time_i = local_time() - meta.last_i_arrival_time;
-				
-				if (elapsed_i_time > 0 && meta.packet_i_count > 1) {
-					bit<32> i_rate = (meta.packet_i_count * 1000000) / elapsed_time;  // Packets per second
-					telemetry.i_frame_rate = i_rate;
-				}
-				telemetry.i_frame_size = packet.length - header_sizes;
-				telemetry.switch_id = 1;  // example switch ID
-				telemetry.ingress_port = meta.ingress_port;
-				telemetry.egress_port = meta.egress_port;
-				telemetry.timestamp = local_time();
-				//telemetry.inter_frame_gaps
-				
-				meta.last_i_arrival_time = local_time();
-				meta.packet_i_count = meta.packet_i_count + 1;
-			}
-			
-			
-			if(header.nal_unit_type == 0b000001 ){ // binary 1 is P frame
-			    telemetry_t telemetry;
-				bit<64> elapsed_time_p = local_time() - meta.last_p_arrival_time;
-				
-				if (elapsed_p_time > 0 && meta.packet_p_count > 1) {
-					bit<32> p_rate = (meta.packet_p_count * 1000000) / elapsed_time_p;  // Packets per second
-					telemetry.p_frame_rate = i_rate;
-				}
-				telemetry.p_frame_size = packet.length - header_sizes;
-				telemetry.switch_id = 1;  // example switch ID
-				telemetry.ingress_port = meta.ingress_port;
-				telemetry.egress_port = meta.egress_port;
-				telemetry.timestamp = local_time();
-				//telemetry.inter_frame_gaps
-				
-				meta.last_p_arrival_time = local_time();
-				meta.packet_p_count = meta.packet_p_count + 1;
-			}
-			
+	action forward_with_telemetry(inout headers hdr, inout metadata meta) {
+        meta.ingress_port = standard_metadata.ingress_port;
+        meta.egress_port = standard_metadata.egress_port;
+        bit<16> header_sizes = 56; // sum of header sizes / 8
+        
+        if(hdr.nal_unit_type == 0b000101){ // binary 5 is I frame
+            telemetry_t telemetry;
+            bit<64> elapsed_time_i = local_time() - meta.last_i_arrival_time;
+            
+            if (elapsed_i_time > 0 && meta.packet_i_count > 1) {
+                bit<32> i_rate = (meta.packet_i_count * 1000000) / elapsed_time;  // Packets per second
+                telemetry.i_frame_rate = i_rate;
+            }
+            telemetry.i_frame_size = packet.length - header_sizes;
+            telemetry.switch_id = 1;  // example switch ID
+            telemetry.ingress_port = meta.ingress_port;
+            telemetry.egress_port = meta.egress_port;
+            telemetry.timestamp = local_time();
+            //telemetry.inter_frame_gaps
+            
+            meta.last_i_arrival_time = local_time();
+            meta.packet_i_count = meta.packet_i_count + 1;
+        }
+        
+        
+        if(hdr.nal_unit_type == 0b000001 ){ // binary 1 is P frame
+            telemetry_t telemetry;
+            bit<64> elapsed_time_p = local_time() - meta.last_p_arrival_time;
+            
+            if (elapsed_p_time > 0 && meta.packet_p_count > 1) {
+                bit<32> p_rate = (meta.packet_p_count * 1000000) / elapsed_time_p;  // Packets per second
+                telemetry.p_frame_rate = i_rate;
+            }
+            telemetry.p_frame_size = packet.length - header_sizes;
+            telemetry.switch_id = 1;  // example switch ID
+            telemetry.ingress_port = meta.ingress_port;
+            telemetry.egress_port = meta.egress_port;
+            telemetry.timestamp = local_time();
+            //telemetry.inter_frame_gaps
+            
+            meta.last_p_arrival_time = local_time();
+            meta.packet_p_count = meta.packet_p_count + 1;
+        }
+        
 
-			send_to_collector(telemetry); // NOT YET IMPLEMENTED
+        send_to_collector(telemetry); // NOT YET IMPLEMENTED
 
-			apply_action(forward(hdr, meta));
-		}
+        apply_action(forward(hdr, meta));
 	}
 
 	action forward(inout headers hdr, inout metadata meta) {
-		apply {
-			standard_metadata.egress_spec = get_egress_port(hdr.ipv4.dstAddr);
-		}
+		standard_metadata.egress_spec = get_egress_port(hdr.ipv4.dstAddr);
 	}
 
 	action drop() {
@@ -224,9 +220,9 @@ control MyIngress(inout headers hdr,
 	******* APPLY *******
 	*********************/
 
-    apply(
-		forward_table
-    );
+    apply{
+		forward_table.apply();
+    }
 }
 
 
