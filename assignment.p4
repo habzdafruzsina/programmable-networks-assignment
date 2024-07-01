@@ -190,6 +190,42 @@ control MyIngress(inout headers hdr,
         apply_action(forward(hdr, meta));
 	}
 
+    action send_to_collector(packet_out packet,
+                            in headers hdr,
+                            in telemetry_t telemetry,
+                            inout metadata meta,
+                            inout standard_metadata_t standard_metadata) {
+        headers new_hdr;
+        //new_hdr.ethernet.dstAddr = /* Collector MAC address */;
+        new_hdr.ethernet.srcAddr = hdr.ethernet.srcAddr;
+        new_hdr.ethernet.etherType = hdr.ethernet.etherType;
+
+        new_hdr.ipv4.version = hdr.ipv4.version;
+        new_hdr.ipv4.ihl = hdr.ipv4.ihl;
+        new_hdr.ipv4.diffserv = hdr.ipv4.diffserv;
+        new_hdr.ipv4.totalLen = hdr.ipv4.totalLen;
+        new_hdr.ipv4.identification = hdr.ipv4.identification;
+        new_hdr.ipv4.flags = hdr.ipv4.flags;
+        new_hdr.ipv4.fragOffset = hdr.ipv4.fragOffset;
+        new_hdr.ipv4.ttl = hdr.ipv4.ttl;
+        new_hdr.ipv4.protocol = hdr.ipv4.protocol;
+        new_hdr.ipv4.hdrChecksum = hdr.ipv4.hdrChecksum;
+        new_hdr.ipv4.srcAddr = hdr.ipv4.srcAddr;
+        //new_hdr.ipv4.dstAddr = /* Collector IP address */;
+
+        new_hdr.udp.srcPort = hdr.udp.srcPort;
+        //new_hdr.udp.dstPort = /* Collector UDP port */;
+        new_hdr.udp.length = hdr.udp.length;
+        new_hdr.udp.checksum = hdr.udp.checksum;
+
+        packet.emit(new_hdr.ethernet);
+        packet.emit(new_hdr.ipv4);
+        packet.emit(new_hdr.udp);
+        packet.emit(telemetry);
+        packet.send(standard_metadata.egress_spec);
+    }
+
+
 	action forward(inout headers hdr, inout metadata meta) {
 		standard_metadata.egress_spec = get_egress_port(hdr.ipv4.dstAddr);
 	}
