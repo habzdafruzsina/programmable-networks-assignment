@@ -35,7 +35,7 @@ paraméterek a send-hez: 10.0.0.2 "Hello H2"
 telemetry:
 1. ea 105-ös dia
 
-maintain state between packages:
+maintain state between packets:
 2. ea 37
 
 sending packets to control plane
@@ -72,3 +72,71 @@ a változásokat tartalmazzák az előzőekhez képest
 A frame headerben lesz a frame típusa (I/P), ahogy a méret is
 A framek packet-ekre osztva mennek át a fogadóhoz (meg vannak számozva)
 Gondolom nekünk mindig az első part-ot kell vizsgálni (?)
+
+digest
+https://github.com/nsg-ethz/p4-learning/wiki/BMv2-Simple-Switch#packet-digests
+https://gitlab.ethz.ch/nsg/public/adv-net-2022-exercises/-/tree/main/02-L2_Switching/03-L2_Learning
+
+https://stackoverflow.com/questions/1685494/what-does-this-h264-nal-header-mean
+https://stackoverflow.com/questions/38094302/how-to-understand-header-of-h264
+https://doc-kurento.readthedocs.io/en/latest/knowledge/h264.html
+
+
+The structure of the NAL unit header in H.265:
+
++---------------+
+|     1 bit     |  forbidden_zero_bit
++---------------+
+|     6 bits    |  nal_unit_type
++---------------+
+|     6 bits    |  nuh_layer_id
++---------------+
+|    3 bits     |  nuh_temporal_id_plus1
++---------------+
+
+forbidden_zero_bit (1 bit):
+
+This bit is reserved and must always be set to zero. It is used to prevent false synchronization.
+
+nal_unit_type (6 bits):
+
+This field indicates the type of NAL unit. It specifies the type of data contained within the NAL unit. Common values for nal_unit_type include:
+0: Unspecified
+1: Coded slice of a non-IDR picture
+2: Coded slice data partition A
+3: Coded slice data partition B
+4: Coded slice data partition C
+5: Coded slice of an IDR picture
+6: Supplemental enhancement information (SEI)
+7: Sequence parameter set (SPS)
+8: Picture parameter set (PPS)
+9: Access unit delimiter (AUD)
+10: End of sequence (EOS)
+11: End of stream (EOB)
+12: Filler data
+and more.
+
+nuh_layer_id (6 bits):
+
+This field specifies the layer identifier for a scalable extension. It is used in scalable video coding scenarios.
+
+nuh_temporal_id_plus1 (3 bits):
+
+This field indicates the temporal identifier of the NAL unit plus one. It is used to support hierarchical coding structures.
+The structure of the NAL header in H.265 allows for flexibility and extensibility, supporting various types of NAL units and enabling features like scalability and hierarchical coding.
+
+
+Networking: When transmitting H.265 video streams over an IP network, the video data is typically encapsulated within transport protocols like RTP (Real-time Transport Protocol) over UDP, which in turn is encapsulated in IPv4, and finally in Ethernet. In this case, packets will have Ethernet and IPv4 headers.
+
+Streaming: When streaming H.265 video over the internet or local networks, protocols like HTTP Live Streaming (HLS) or Dynamic Adaptive Streaming over HTTP (DASH) may be used, which rely on HTTP/TCP/IP stacks. Here, you might see TCP/IPv4 or TCP/IPv6 headers.
+
+packet structure:
+-Ethernet Header: Provides MAC addresses and EtherType.
+-IPv4/IPv6 Header: Provides source and destination IP addresses, protocol type, etc.
+-UDP Header: Provides source and destination ports, length, and checksum.
+-RTP Header: Real-time transport protocol header used for streaming.
+-H.265 NAL Unit: Contains the actual video data.
+
+Locally: When H.265 video streams are stored as files, they typically do not have Ethernet or IP headers. Instead, they are stored in a container format (e.g., MP4, MKV) that includes only the video and audio data with container-specific headers.
+
+The actual slice header can vary depending on the specific implementation and profile of H.265.
