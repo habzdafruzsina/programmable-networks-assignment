@@ -1,15 +1,17 @@
 {
-  "p4_src": "repeater.p4",
+  "p4_src": "assignment.p4",
   "cli": true,
   "pcap_dump": true,
   "enable_log": true,
   "topology": {
     "assignment_strategy": "l2",
-    "links": [["h1", "s1"], ["h2", "s1"]],
+    "links": [["h1", "s1"], ["h2", "s1"], ["t1", "s1"]],
     "hosts": {
       "h1": {
       },
       "h2": {
+      },
+      "t1": {
       }
     },
     "switches": {
